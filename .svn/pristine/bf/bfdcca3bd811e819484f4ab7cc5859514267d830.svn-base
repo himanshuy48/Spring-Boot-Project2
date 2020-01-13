@@ -1,0 +1,440 @@
+package com.digi.uniprr.controller;
+
+import static com.digi.uniprr.utils.AppConstants.CONFIGURE_JOURNAL;
+import static com.digi.uniprr.utils.AppConstants.YES;
+
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.json.simple.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.digi.uniprr.VO.AssignAdminVO;
+import com.digi.uniprr.VO.AutoMailersVO;
+import com.digi.uniprr.VO.CommonVO;
+import com.digi.uniprr.VO.IDVO;
+import com.digi.uniprr.VO.JournalMailTemplatesVO;
+import com.digi.uniprr.VO.JournalPlagiarismMasterVO;
+import com.digi.uniprr.VO.JournalPlagiarismUpdateVO;
+import com.digi.uniprr.VO.JournalTatConfigurationVO;
+import com.digi.uniprr.VO.JournalVO;
+import com.digi.uniprr.VO.JournalsConfigurationVO;
+import com.digi.uniprr.VO.KeywordsVO;
+import com.digi.uniprr.VO.ManageJournalVO;
+import com.digi.uniprr.VO.TurnAroundTimeVO;
+import com.digi.uniprr.model.FileType;
+import com.digi.uniprr.model.Journal;
+import com.digi.uniprr.model.JournalconfigFileUpload;
+import com.digi.uniprr.model.Keywords;
+import com.digi.uniprr.service.JournalConfigurationService;
+import com.digi.uniprr.service.ManuscriptTypeChargeService;
+
+@RestController
+@RequestMapping("/journalconfig")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
+public class JournalConfigurationRestController {
+	
+	private final Logger log = LoggerFactory.getLogger(this.getClass());
+	
+	@Autowired
+	ManuscriptTypeChargeService manuscriptTypeChargeService;
+	@Autowired
+	private JournalConfigurationService journalConfigurationService;
+	@Autowired
+	Environment environment;
+
+	@RequestMapping(value = "/submit", method = RequestMethod.POST)
+	public JournalsConfigurationVO journalConfigurationInitiate(@RequestBody ManageJournalVO manageJournalVO) {
+		log.info("Inside JournalConfigurationRestController journalConfigurationInitiate");
+		Journal journal;
+		JournalsConfigurationVO journalsConfigurationVO;
+		if (manageJournalVO.getJournalConfiguration().equals(CONFIGURE_JOURNAL)) {
+			journalsConfigurationVO = new JournalsConfigurationVO();
+			if (manageJournalVO.getIsCopyConfiguration()) {
+				journal = journalConfigurationService.getJournalById(manageJournalVO.getExistingJournalId());
+				journalsConfigurationVO = journalConfigurationService.mapJournalProperties(journal);
+			}
+			journalsConfigurationVO.setIsNew(true);
+		} else {
+			journal = journalConfigurationService.getJournalById(manageJournalVO.getExistingJournalId());
+			journalsConfigurationVO = journalConfigurationService.mapJournalProperties(journal);
+			journalsConfigurationVO.setIsNew(false);
+		}
+		return journalsConfigurationVO;
+	}
+
+	@RequestMapping(value = "/saveJournalConfiguration", method = RequestMethod.POST)
+	public ResponseEntity<?> saveJournalConfiguration(@RequestBody JournalsConfigurationVO journalsConfigurationVO) {
+		log.info("Inside JournalConfigurationRestController saveJournalConfiguration");
+		Integer journalId = journalConfigurationService.configureAndSaveJournal(journalsConfigurationVO);
+		journalConfigurationService.saveJournalMetadata(journalsConfigurationVO, journalId);
+		
+		if (journalsConfigurationVO.getChargeFlag() != null &&
+				journalsConfigurationVO.getChargeFlag().equalsIgnoreCase(YES)) {
+			if(journalsConfigurationVO.getChargeOn()!=null && journalsConfigurationVO.getChargeOn().equalsIgnoreCase("manuscript_type")) {
+				manuscriptTypeChargeService.saveJournalManuscriptTypeCharge(journalsConfigurationVO);
+			}else {
+				journalConfigurationService.saveJournalChargeDetails(journalsConfigurationVO, journalId);
+			}
+			
+		}
+		JSONObject obj = new JSONObject();
+		obj.put("message", "Successfully Created");
+		obj.put("journalId", journalId);
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+	
+	@RequestMapping(value = "/deleteManuscriptTypeJournal", method = RequestMethod.POST)
+	public ResponseEntity<?> deleteManuscriptTypeJournal(@RequestBody IDVO vo) {
+		log.info("Inside JournalConfigurationRestController deleteManuscriptTypeJournal");
+		journalConfigurationService.deleteManuscriptTypeJournal(vo.getId());
+		JSONObject obj = new JSONObject();
+		obj.put("message", "Succesfully Deleted");
+		return new ResponseEntity<> (obj, HttpStatus.OK);
+	}
+
+	@RequestMapping(value = "/saveJournalBlindType", method = RequestMethod.POST)
+	public ResponseEntity<?> saveJournalBlindType(@RequestParam Integer id, @RequestParam String blindType) {
+		log.info("Inside JournalConfigurationRestController saveJournalBlindType");
+		journalConfigurationService.saveJournalBlindType(id, blindType);
+		return new ResponseEntity<>(HttpStatus.OK);
+	}
+
+	// Upload Files
+	@PostMapping("getFileList")
+	public List<JournalconfigFileUpload> getFileList(@RequestBody JournalVO journalVO) {
+		log.info("Inside JournalConfigurationRestController getFileList");
+		return journalConfigurationService.getFileList(journalVO.getJournalId());
+	}
+	
+	@PostMapping("deleteJournalFile")
+	public ResponseEntity<Object> deleteJournalFile(@RequestBody JournalVO journalVO) {
+		log.info("Inside JournalConfigurationRestController deleteJournalFile");
+		JSONObject obj = new JSONObject();
+		try {
+			String result=journalConfigurationService.deleteJournalconfigFile(journalVO);
+			obj.put("data", result);
+		} catch (Exception e) {
+			e.printStackTrace();
+			obj.put("message", "Some Error occured");
+		}
+		return new ResponseEntity<Object>(obj,HttpStatus.OK);
+	}
+	
+	@RequestMapping(value = "/uploadMultipleFile", method = RequestMethod.POST)
+	public @ResponseBody ResponseEntity<?> uploadMultipleFileHandler(@RequestParam("files") MultipartFile[] files,
+			@RequestParam("journalId") Integer journalId, HttpServletRequest request) throws IOException {
+		log.info("Inside JournalConfigurationRestController uploadMultipleFileHandler");
+		String attachmentFolderPath = environment.getProperty("file.zipMaking-dir") + "//"
+				+ "UniprrFileJournalConfigFile" + "//" + "MNT_LWW_JOURNAL_" + journalId;
+
+		File dir = new File(attachmentFolderPath);
+		if (!dir.exists()) {
+			dir.mkdirs();
+		}
+
+		JSONObject obj = new JSONObject();
+
+		for (int i = 0; i < files.length; i++) {
+			MultipartFile file = files[i];
+			BufferedOutputStream stream = null;
+			try {
+				byte[] bytes = file.getBytes();
+
+				File serverFile = new File(dir + File.separator + file.getOriginalFilename());
+				stream = new BufferedOutputStream(new FileOutputStream(serverFile));
+				stream.write(bytes);
+				double fileSizeinBytes = file.getSize();
+				double fileSizeInKB = Math.round((fileSizeinBytes / 1024));
+				String FilePath = environment.getProperty("file.upload-dirServer") + "//"
+						+ "UniprrFileJournalConfigFile" + "//" + "MNT_LWW_JOURNAL_" + journalId + "//"
+						+ file.getOriginalFilename();
+				JournalconfigFileUpload JournalconfigFileUpload = new JournalconfigFileUpload();
+				JournalconfigFileUpload.setFileName(file.getOriginalFilename());
+				JournalconfigFileUpload.setFilePath(FilePath);
+				JournalconfigFileUpload.setFileSize((int) fileSizeInKB);
+				JournalconfigFileUpload.setJournalId(journalId);
+				journalConfigurationService.saveFile(JournalconfigFileUpload);
+				List<JournalconfigFileUpload> fileList = journalConfigurationService.getFileList(journalId);
+			} catch (Exception e) {
+				obj.put("You failed to upload", file.getOriginalFilename());
+				return new ResponseEntity<Object>(obj, HttpStatus.INTERNAL_SERVER_ERROR);
+			} finally {
+				try {
+					stream.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		obj.put("You successfully uploaded file=", files.length);
+		return new ResponseEntity<Object>(obj, HttpStatus.OK);
+	}
+
+	@GetMapping("getFileTypeList")
+	public List<FileType> getFileTypeList() {
+		log.info("Inside JournalConfigurationRestController getFileTypeList");
+		return journalConfigurationService.getFileTypeList();
+	}
+
+	@PostMapping("saveList")
+	public ResponseEntity<?> saveList(@RequestBody List<JournalconfigFileUpload> journalconfigFileUpload) {
+		log.info("Inside JournalConfigurationRestController saveList");
+		JSONObject obj = new JSONObject();
+		try {
+			String result=journalConfigurationService.saveList(journalconfigFileUpload);
+			obj.put("data", result);
+		} catch (Exception e) {
+			obj.put("message", "Some Error occured");
+		}
+		return new ResponseEntity<Object>(obj, HttpStatus.OK);
+	}
+
+	@PostMapping("downloadJournalFile")
+	public ResponseEntity<?> downloadJournalFile(@RequestBody JournalVO journalVO) {
+		log.info("Inside JournalConfigurationRestController downloadJournalFile");
+		JSONObject obj = new JSONObject();
+		try {
+			String result=journalConfigurationService.downloadJournalFile(journalVO);
+			obj.put("FilePath", result);
+		} catch (Exception e) {
+			obj.put("message", "Some Error occured");
+		}
+		return new ResponseEntity<Object>(obj, HttpStatus.OK);
+	}
+	
+	
+	/*********Keywords******/
+	@PostMapping("getJournalKeyWordList")
+	public List<KeywordsVO> getJournalKeyWordList(@RequestBody JournalVO journalVO) {
+		log.info("Inside JournalConfigurationRestController getJournalKeyWordList");
+		List<KeywordsVO> voList = journalConfigurationService.getJournalKeyWordList(journalVO.getId());
+		return voList;
+	}
+
+	@PostMapping("createKeyWords")
+	public ResponseEntity<?> createKeyWords(@RequestBody List<Keywords> KeyWords) {
+		log.info("Inside JournalConfigurationRestController createKeyWords");
+		JSONObject obj = new JSONObject();
+		try {
+			journalConfigurationService.saveKeyWords(KeyWords);
+		} catch (Exception e) {
+			e.printStackTrace();
+			obj.put("message", "Some Error occured");
+			return new ResponseEntity<>(obj, HttpStatus.OK);
+		}
+
+		obj.put("message", "Keywords created Successfully");
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+
+	@RequestMapping(value = "/editKeywords", method = RequestMethod.POST)
+	public ResponseEntity<?> editKeywords(@RequestBody Keywords vo) {
+		log.info("Inside JournalConfigurationRestController editKeywords");
+		JSONObject obj = new JSONObject();
+		try {
+			Keywords keywords = journalConfigurationService.updateKeyword(vo);
+			obj.put("data", "Updated...");
+		}catch(Exception e) {
+			obj.put("data", "Something Went Wrong");
+		}
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+
+	@RequestMapping(value = "/editKeywordsList", method = RequestMethod.POST)
+	public ResponseEntity<?> editKeywordsList(@RequestBody CommonVO reviewer) {
+		log.info("Inside JournalConfigurationRestController editKeywordsList");
+		journalConfigurationService.updateKeywordList(reviewer.getReviewer());
+		JSONObject obj = new JSONObject();
+		obj.put("message", "Object List updated succesfully");
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+
+	@GetMapping("getJournalsList")
+	public List<Journal> getJournalsList() {
+		log.info("Inside JournalConfigurationRestController getJournalsList");
+		return journalConfigurationService.getJournalsList();
+	}
+
+	
+	// Dev Here New
+
+	@PostMapping("getPlagiarismlist")
+	public ResponseEntity<?> getjournalPlagiarismlist(@RequestParam("journalId") Integer journalId) {
+		log.info("Inside JournalConfigurationRestController getjournalPlagiarismlist");
+		JSONObject obj = new JSONObject();
+		try {
+			List<JournalPlagiarismMasterVO> list = journalConfigurationService.getjournalPlagiarismlist(journalId);
+			return new ResponseEntity<>(list, HttpStatus.OK);
+		} catch (Exception e) {
+			obj.put("message", "Some Error occured");
+		}
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+
+	@PostMapping("updatePlagiarism")
+	public ResponseEntity<?> updatePlagiarism(@RequestBody List<JournalPlagiarismUpdateVO> journalPlagiarismUpdateVO) {
+		log.info("Inside JournalConfigurationRestController updatePlagiarism");
+		JSONObject obj = new JSONObject();
+		try {
+			journalConfigurationService.updatePlagiarism(journalPlagiarismUpdateVO);
+			obj.put("message", "Data is Updated");
+		} catch (Exception e) {
+			obj.put("message", "Some Error occured");
+		}
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+
+	// update and create Blind
+	@PostMapping("blind")
+	public ResponseEntity<?> blind(@RequestParam("journalId") Integer journalId, @RequestParam("type") String type) {
+		log.info("Inside JournalConfigurationRestController blind");
+		JSONObject obj = new JSONObject();
+		try {
+			String data = journalConfigurationService.blind(journalId, type);
+			obj.put("message", data);
+		} catch (Exception e) {
+			obj.put("message", "Some Error occured");
+		}
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+
+	@PostMapping("getBlind")
+	public ResponseEntity<?> getBlind(@RequestParam("journalId") Integer journalId) {
+		log.info("Inside JournalConfigurationRestController getBlind");
+		JSONObject obj = new JSONObject();
+		try {
+			obj.put("BlindType", journalConfigurationService.getBlind(journalId));
+			
+		} catch (Exception e) {
+			obj.put("message", "Some Error occured");
+		}
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+
+	/********* Assign Admin ***********/
+	@RequestMapping(value = "/assignAdminList", method = RequestMethod.POST)
+	public ResponseEntity<?> getAssignAdminList(@RequestBody IDVO vo) {
+		log.info("Inside JournalConfigurationRestController getAssignAdminList");
+		List<Integer> userId = journalConfigurationService.getAssignAdminIdList(vo.getId());
+		return new ResponseEntity<> (userId, HttpStatus.OK);
+	}
+	
+	@RequestMapping(value = "/assignAdmin", method = RequestMethod.POST)
+	public ResponseEntity<?> assignAdmin(@RequestBody AssignAdminVO assignAdminVO) {
+		log.info("Inside JournalConfigurationRestController assignAdmin");
+		journalConfigurationService.assignAdmin(assignAdminVO);
+		JSONObject obj = new JSONObject();
+		obj.put("message", "Object saved successfully");
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+
+	@PostMapping("getjournalTatConfigurationList")
+	public ResponseEntity<?> getjournalTatConfigurationList(@RequestBody TurnAroundTimeVO turnAroundTimeVO) {
+		log.info("Inside JournalConfigurationRestController getjournalTatConfigurationList");
+		return new ResponseEntity<>(journalConfigurationService.getjournalTatConfigurationList(turnAroundTimeVO), HttpStatus.OK);
+	}
+
+	//Save And Update
+	@PostMapping("saveJournalTatConfiguration")
+	public ResponseEntity<?> saveJournalTatConfiguration(@RequestBody JournalTatConfigurationVO journalTatConfigurationVO) {
+		log.info("Inside JournalConfigurationRestController saveJournalTatConfiguration");
+		JSONObject obj = new JSONObject();
+		String message=journalConfigurationService.saveJournalTatConfiguration(journalTatConfigurationVO);
+		obj.put("message", message);
+		return new ResponseEntity<>(obj,HttpStatus.OK);
+	}
+
+	@GetMapping("getEmailTemplateData")
+	public ResponseEntity<?> getEmailTemplateData() {
+		log.info("Inside JournalConfigurationRestController getEmailTemplateData");
+		return new ResponseEntity<>(journalConfigurationService.getEmailTemplateData(),HttpStatus.OK);
+	}
+	
+	//Save And Update Journal Mail Template
+	@PostMapping("saveJournalMailTemplate")
+	public ResponseEntity<?> saveJournalMailTemplate(@RequestBody JournalMailTemplatesVO journalMailTemplatesVO) {
+		log.info("Inside JournalConfigurationRestController saveJournalMailTemplate");
+		JSONObject obj = new JSONObject();
+		String message=journalConfigurationService.saveJournalMailTemplate(journalMailTemplatesVO);
+		obj.put("message", message);
+		return new ResponseEntity<>(obj,HttpStatus.OK);
+	}
+	
+	@PostMapping("getEmailTemplates")
+	public ResponseEntity<?> getEmailTemplates(@RequestParam("journalId") Integer journalId) {
+		log.info("Inside JournalConfigurationRestController getEmailTemplates");
+		JSONObject obj = new JSONObject();
+		try {
+			List<JournalMailTemplatesVO> data = journalConfigurationService.getEmailTemplates(journalId);
+			if(data!=null && !data.isEmpty()) {
+				return new ResponseEntity<>(data, HttpStatus.OK);
+			}else {
+				obj.put("message", "Data not found");
+			}
+		} catch (Exception e) {
+			obj.put("message", "Some Error occured");
+		}
+		return new ResponseEntity<>(obj, HttpStatus.OK);
+	}
+	
+	//Auto Mailers
+	
+	@GetMapping("getTaskName")
+	public ResponseEntity<?> getTaskName() {
+		log.info("Inside JournalConfigurationRestController getTaskName");
+		return new ResponseEntity<>(journalConfigurationService.getTaskName(),HttpStatus.OK);
+	}
+	
+	@PostMapping("saveAutoMailers")
+	public ResponseEntity<?> saveAutoMailers(@RequestBody AutoMailersVO autoMailersVO ) {
+		log.info("Inside JournalConfigurationRestController saveAutoMailers");
+		JSONObject obj = new JSONObject();
+		String data=journalConfigurationService.saveAutoMailers(autoMailersVO);
+		obj.put("message", data);
+		return new ResponseEntity<>(obj,HttpStatus.OK);
+	}
+	
+	@PostMapping("getAutoMailersList")
+	public ResponseEntity<?> getAutoMailesList(@RequestBody AutoMailersVO autoMailersVO) {
+		log.info("Inside JournalConfigurationRestController getAutoMailesList");
+		JSONObject obj = new JSONObject();
+		List<AutoMailersVO> list=journalConfigurationService.getAutoMailesList(autoMailersVO);
+		if(list!=null && !list.isEmpty()) {
+			return new ResponseEntity<>(list, HttpStatus.OK);
+		}else {
+			obj.put("message", "Data not found");
+			return new ResponseEntity<>(obj, HttpStatus.OK);
+		}
+	}
+	
+	@PostMapping("deleteAutoMailer")
+	public ResponseEntity<?> deleteAutoMailer(@RequestBody AutoMailersVO autoMailersVO ) {
+		log.info("Inside JournalConfigurationRestController deleteAutoMailer");
+		JSONObject obj = new JSONObject();
+		String message=journalConfigurationService.deleteAutoMailer(autoMailersVO);
+		obj.put("message", message);
+		return new ResponseEntity<>(obj,HttpStatus.OK);
+	}
+	
+}

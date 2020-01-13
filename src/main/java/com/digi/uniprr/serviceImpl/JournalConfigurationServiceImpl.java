@@ -1,0 +1,797 @@
+package com.digi.uniprr.serviceImpl;
+
+import static com.digi.uniprr.utils.AppConstants.TEMPLATE_PLACEHOLDERS;
+import static com.digi.uniprr.utils.AppConstants.YES;
+import static com.digi.uniprr.utils.AppConstants.NO;
+import static com.digi.uniprr.utils.AppConstants.*;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.transaction.Transactional;
+
+import org.apache.tomcat.util.http.fileupload.FileUtils;
+import org.json.simple.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Service;
+
+import com.digi.uniprr.VO.AssignAdminVO;
+import com.digi.uniprr.VO.AutoMailersVO;
+import com.digi.uniprr.VO.JournalMailTemplatesVO;
+import com.digi.uniprr.VO.JournalPlagiarismMasterVO;
+import com.digi.uniprr.VO.JournalPlagiarismUpdateVO;
+import com.digi.uniprr.VO.JournalTatConfigurationVO;
+import com.digi.uniprr.VO.JournalVO;
+import com.digi.uniprr.VO.JournalsConfigurationVO;
+import com.digi.uniprr.VO.KeywordsVO;
+import com.digi.uniprr.VO.ManuscriptTypeJournalVO;
+import com.digi.uniprr.VO.TurnAroundTimeVO;
+import com.digi.uniprr.model.EmailTemplateData;
+import com.digi.uniprr.model.FileType;
+import com.digi.uniprr.model.Journal;
+import com.digi.uniprr.model.JournalChargeDetails;
+import com.digi.uniprr.model.JournalMailTemplates;
+import com.digi.uniprr.model.JournalMetadata;
+import com.digi.uniprr.model.JournalPlagiarismMaster;
+import com.digi.uniprr.model.JournalPlagirism;
+import com.digi.uniprr.model.JournalTatConfiguration;
+import com.digi.uniprr.model.JournalconfigFileUpload;
+import com.digi.uniprr.model.Keywords;
+import com.digi.uniprr.model.MailTemplates;
+import com.digi.uniprr.model.ManuscriptTypeJournal;
+import com.digi.uniprr.model.MasterAttributes;
+import com.digi.uniprr.model.Role;
+import com.digi.uniprr.model.StatusMaster;
+import com.digi.uniprr.model.TaskEmailMap;
+import com.digi.uniprr.model.TaskMaster;
+import com.digi.uniprr.model.User;
+import com.digi.uniprr.model.UserJournal;
+import com.digi.uniprr.repository.EmailTemplateDataRepo;
+import com.digi.uniprr.repository.FileTypeRepo;
+import com.digi.uniprr.repository.JournalChargeDetailsRepo;
+import com.digi.uniprr.repository.JournalKeywordRepo;
+import com.digi.uniprr.repository.JournalMailTemplatesRepo;
+import com.digi.uniprr.repository.JournalManagingEditorMappingRepo;
+import com.digi.uniprr.repository.JournalMetadataRepo;
+import com.digi.uniprr.repository.JournalPlagiarismMasterRepo;
+import com.digi.uniprr.repository.JournalPlagirismRepo;
+import com.digi.uniprr.repository.JournalTatConfigurationRepo;
+import com.digi.uniprr.repository.JournalconfigFileUploadRepo;
+import com.digi.uniprr.repository.JournalsRepo;
+import com.digi.uniprr.repository.KeywordsRepo;
+import com.digi.uniprr.repository.MailTemplatesRepo;
+import com.digi.uniprr.repository.ManuscriptTypeJournalsRepo;
+import com.digi.uniprr.repository.MasterAttributesRepo;
+import com.digi.uniprr.repository.RoleRepo;
+import com.digi.uniprr.repository.StatusMasterRepo;
+import com.digi.uniprr.repository.TaskEmailMapRepo;
+import com.digi.uniprr.repository.TaskMasterRepo;
+import com.digi.uniprr.repository.UserJournalRepo;
+import com.digi.uniprr.repository.UserRepo;
+import com.digi.uniprr.service.JournalConfigurationService;
+import com.digi.uniprr.utils.KeywordsTransformationUtils;
+import com.digi.uniprr.utils.ManuscriptTypeJournalTransformationUtils;
+
+@Service
+@Transactional
+public class JournalConfigurationServiceImpl implements JournalConfigurationService {
+
+	@Autowired
+	Environment environment;
+	
+	@Autowired
+	private JournalsRepo journalRepo;
+
+	@Autowired
+	private ManuscriptTypeJournalsRepo manuscriptTypeJournalsRepo;
+
+	@Autowired
+	private JournalconfigFileUploadRepo journalconfigFileUploadRepo;
+
+	@Autowired
+	private FileTypeRepo fileTypeRepo;
+
+	@Autowired
+	private MailTemplatesRepo mailTemplatesRepo;
+
+	@Autowired
+	private JournalKeywordRepo journalKeywordRepo;
+
+	@Autowired
+	private KeywordsRepo keywordsRepo;
+
+	@Autowired
+	private JournalsRepo journalsRepo;
+
+	@Autowired
+	private JournalMailTemplatesRepo journalMailTemplatesRepo;
+
+	@Autowired
+	private JournalPlagirismRepo journalPlagirismRepo;
+
+	@Autowired
+	private JournalPlagiarismMasterRepo journalPlagiarismMasterRepo;
+
+	@Autowired
+	private JournalMetadataRepo journalMetadataRepo;
+	
+	@Autowired
+	private JournalChargeDetailsRepo journalChargeDetailsRepo;
+
+	@Autowired
+	private JournalManagingEditorMappingRepo jeMappingRepo;
+
+	@Autowired
+	private StatusMasterRepo statusMasterRepo;
+
+	@Autowired
+	private JournalTatConfigurationRepo journalTatConfigurationRepo;
+
+	@Autowired
+	private EmailTemplateDataRepo emailTemplateDataRepo;
+
+	@Autowired
+	private RoleRepo roleRepo;
+
+	@Autowired
+	private TaskMasterRepo taskMasterRepo;
+
+	@Autowired
+	private TaskEmailMapRepo taskEmailMapRepo;
+
+	@Autowired
+	private UserRepo userRepo;
+	
+	@Autowired
+	private UserJournalRepo userJournalRepo;
+	
+	@Autowired
+	private MasterAttributesRepo masterAttributesRepo;
+
+	JSONObject obj = new JSONObject();
+
+	@Override
+	public Journal getJournalById(Integer id) {
+		return journalRepo.getOne(id);
+	}
+
+	@Override
+	public JournalsConfigurationVO mapJournalProperties(Journal journal) {
+		JournalsConfigurationVO journalsConfigurationVO = new JournalsConfigurationVO();
+		journalsConfigurationVO.setManuscriptTypeJournals(ManuscriptTypeJournalTransformationUtils.mapModelListToVOList(
+				manuscriptTypeJournalsRepo.getManuscriptTypesFromJournalId(journal.getJournalId())));
+
+		journalsConfigurationVO.setJournalId(journal.getJournalId());
+		journalsConfigurationVO.setJournalCode(journal.getJournalCode());
+		journalsConfigurationVO.setChargeFlag(journal.getChargeFlag());
+		journalsConfigurationVO.setJournalLogo(journal.getJournalLogo());
+		journalsConfigurationVO.setJournalTitle(journal.getJournalTitle());
+		journalsConfigurationVO.setJournalShortTitle(journal.getJournalShortTitle());
+
+		if (journal.getJournalMetadata() != null) {
+			journalsConfigurationVO.setJournalMetadataId(journal.getJournalMetadata().getMetadataId());
+			journalsConfigurationVO.setJournalAffilation(journal.getJournalMetadata().getAffilitaedTo());
+			journalsConfigurationVO.setJournalBibliography(journal.getJournalMetadata().getBibliography());
+			journalsConfigurationVO.setJournalCopernicusIndex(journal.getJournalMetadata().getJournalIndexCopernicus());
+			journalsConfigurationVO.setJournalDoi(journal.getJournalMetadata().getJournalDOI());
+			journalsConfigurationVO.setJournalEissn(journal.getJournalMetadata().getJournalEissn());
+			journalsConfigurationVO.setJournalFrequency(journal.getJournalMetadata().getJournalFrequency());
+			journalsConfigurationVO.setJournalIssn(journal.getJournalMetadata().getJournalIssn());
+			journalsConfigurationVO.setJournalOpenAccess(journal.getJournalMetadata().getOpenAccess());
+			journalsConfigurationVO.setJournalSpeciality(journal.getJournalMetadata().getJournalSpeciality());
+			journalsConfigurationVO.setJournalReadership(journal.getJournalMetadata().getJournalReadership());
+			journalsConfigurationVO.setJournalSubCategory(journal.getJournalMetadata().getJournalSubCategory());
+			journalsConfigurationVO.setJournalSubject(journal.getJournalMetadata().getJournalSubject());
+			journalsConfigurationVO.setJournalWorkflowId(journal.getJournalWorkflowId());
+			journalsConfigurationVO.setImpactFactor(journal.getJournalMetadata().getImpactFactor());
+			journalsConfigurationVO.setAcceptanceRate(journal.getJournalMetadata().getAcceptanceRate());
+			journalsConfigurationVO.setCiteScore(journal.getJournalMetadata().getCiteScore());
+			journalsConfigurationVO.setPublicationType(journal.getJournalMetadata().getPublicationType());
+			journalsConfigurationVO.setJournalOpenAccess(journal.getJournalMetadata().getOpenAccess());
+		}
+		
+		JournalChargeDetails charge = journalChargeDetailsRepo.getJournalChargeDetailsByJournal(journal.getJournalId());
+		if (charge != null) {
+			//charge.get
+			
+			journalsConfigurationVO.setAdditionalCharges(charge.getAdditionalCharges());
+			journalsConfigurationVO.setBlackWhiteCharges(charge.getBlackWhiteCharges());
+			journalsConfigurationVO.setColorCharges(charge.getColorCharges());
+			journalsConfigurationVO.setProductionCharges(charge.getProductionCharges());
+			journalsConfigurationVO.setTableCharges(charge.getTableCharges());
+			journalsConfigurationVO.setTypeSettingCharges(charge.getTypeSettingCharges());
+			journalsConfigurationVO.setFixedCharges(charge.getFixedCharges());
+			journalsConfigurationVO.setFixedChargeAmount(charge.getFixedChargeAmount());
+		}
+
+		return journalsConfigurationVO;
+	}
+
+	@Override
+	public Integer configureAndSaveJournal(JournalsConfigurationVO journalConfigurationVO) {
+
+		Journal journal = mapJournalConfigurationVOPropertiesToJournal(journalConfigurationVO);
+
+		List<ManuscriptTypeJournalVO> list = journalConfigurationVO.getManuscriptTypeJournals();
+
+		if (list != null) {
+			List<ManuscriptTypeJournal> manuscriptTypeJournalList = ManuscriptTypeJournalTransformationUtils
+					.mapVOListToModelList(list);
+			for (ManuscriptTypeJournal manuscriptTypeJournal : manuscriptTypeJournalList)
+				manuscriptTypeJournal.setJournalId(journal.getJournalId());
+
+			manuscriptTypeJournalsRepo.saveAll(manuscriptTypeJournalList);
+		}
+
+		return journal.getJournalId();
+	}
+
+	public Journal mapJournalConfigurationVOPropertiesToJournal(JournalsConfigurationVO journalsConfigurationVO) {
+
+		Journal journal;
+		if (journalsConfigurationVO.getJournalId() != null && journalsConfigurationVO.getJournalId() > 0)
+			journal = journalRepo.getOne(journalsConfigurationVO.getJournalId());
+		else {
+			journal = new Journal();
+			journal.setIsActive(1);
+		}
+
+		if (journalsConfigurationVO.getJournalId() != null)
+			journal.setJournalId(journalsConfigurationVO.getJournalId());
+
+		journal.setPublisherId(journalsConfigurationVO.getPublisherId());
+		journal.setJournalCode(journalsConfigurationVO.getJournalCode());
+		journal.setJournalTitle(journalsConfigurationVO.getJournalTitle());
+		journal.setChargeFlag(journalsConfigurationVO.getChargeFlag());
+		journal.setJournalLogo(journalsConfigurationVO.getJournalLogo());
+		if(journalsConfigurationVO.getCreatedBy()!=null) {
+			journal.setCreatedBy(Integer.parseInt(journalsConfigurationVO.getCreatedBy()));
+		}
+		
+		Journal savedJournal = journalRepo.save(journal);
+		
+		  
+		/*
+		 * JournalMetadata journalMetadata =
+		 * journalMetadataRepo.metaDatalistByJournalId(savedJournal.getJournalId()); if
+		 * (journalMetadata == null) journalMetadata = new JournalMetadata();
+		 * 
+		 * journalMetadata.setColourFigures(journalsConfigurationVO.getColourFigure());
+		 * journalMetadata.setIsChargingRequired(journalsConfigurationVO.
+		 * getJournalChargeFlag());
+		 * journalMetadata.setJournalDOI(journalsConfigurationVO.getJournalDoi());
+		 * journalMetadata.setJournalEissn(journalsConfigurationVO.getJournalEissn());
+		 * journalMetadata.setJournalIssn(journalsConfigurationVO.getJournalIssn());
+		 * journalMetadata.setAffilitaedTo(journalsConfigurationVO.getJournalAffilation(
+		 * )); journalMetadata.setBibliography(journalsConfigurationVO.
+		 * getJournalBibliography());
+		 * journalMetadata.setJournalId(journalsConfigurationVO.getJournalId());
+		 * journalMetadata.setJournalIndexCopernicus(journalsConfigurationVO.
+		 * getJournalCopernicusIndex());
+		 * journalMetadata.setJournalReadership(journalsConfigurationVO.
+		 * getJournalReadership());
+		 * journalMetadata.setJournalSubCategory(journalsConfigurationVO.
+		 * getJournalReadership());
+		 * journalMetadata.setJournalSpeciality(journalsConfigurationVO.
+		 * getJournalSpeciality());
+		 * 
+		 * journalMetadataRepo.save(journalMetadata);
+		 */
+		 
+		return savedJournal;
+
+	}
+
+	@Override
+	public void saveJournalMetadata(JournalsConfigurationVO journalsConfigurationVO, Integer journalId) {
+		JournalMetadata journalMetadata = journalMetadataRepo.metaDatalistByJournalId(journalId);
+		if (journalMetadata == null)
+			journalMetadata = new JournalMetadata();
+		journalMetadata.setJournalId(journalId);
+		journalMetadata.setColourFigures(journalsConfigurationVO.getColourFigure());
+		journalMetadata.setIsChargingRequired(journalsConfigurationVO.getJournalChargeFlag());
+		journalMetadata.setJournalDOI(journalsConfigurationVO.getJournalDoi());
+		journalMetadata.setJournalEissn(journalsConfigurationVO.getJournalEissn());
+		journalMetadata.setJournalIssn(journalsConfigurationVO.getJournalIssn());
+		journalMetadata.setAffilitaedTo(journalsConfigurationVO.getJournalAffilation());
+		journalMetadata.setBibliography(journalsConfigurationVO.getJournalBibliography());
+		journalMetadata.setJournalIndexCopernicus(journalsConfigurationVO.getJournalCopernicusIndex());
+		journalMetadata.setJournalReadership(journalsConfigurationVO.getJournalReadership());
+		journalMetadata.setJournalSubCategory(journalsConfigurationVO.getJournalReadership());
+		journalMetadata.setJournalSubject(journalsConfigurationVO.getJournalSubject());
+		journalMetadata.setJournalSpeciality(journalsConfigurationVO.getJournalSpeciality());
+		journalMetadata.setCiteScore(journalsConfigurationVO.getCiteScore());
+		journalMetadata.setAcceptanceRate(journalsConfigurationVO.getAcceptanceRate());
+		journalMetadata.setImpactFactor(journalsConfigurationVO.getImpactFactor());
+		if(journalsConfigurationVO.getChargeFlag() !=null) {
+			journalMetadata.setIsChargingRequired(journalsConfigurationVO.getChargeFlag());
+			if(journalsConfigurationVO.getChargeOn()!=null)
+				journalMetadata.setChargeOn(journalsConfigurationVO.getChargeOn());
+		}else {
+			journalMetadata.setIsChargingRequired("no");
+		}
+		
+		journalMetadataRepo.save(journalMetadata);
+	}
+	
+	@Override
+	public void saveJournalChargeDetails(JournalsConfigurationVO journalsConfigurationVO, Integer journalId) {
+		JournalChargeDetails charge = journalChargeDetailsRepo.getJournalChargeDetailsByJournal(journalId);
+		
+		if (charge == null) {
+			charge = new JournalChargeDetails();
+			charge.setJournalId(journalId);
+		}
+		
+		charge.setFixedCharges(journalsConfigurationVO.getFixedCharges());
+		if (journalsConfigurationVO.getFixedCharges() != null && 
+				journalsConfigurationVO.getFixedCharges().equalsIgnoreCase(YES)) 
+			charge.setFixedChargeAmount(journalsConfigurationVO.getFixedChargeAmount());
+		
+		else if (journalsConfigurationVO.getFixedCharges() != null && 
+				journalsConfigurationVO.getFixedCharges().equalsIgnoreCase(NO)){
+			charge.setTableCharges(journalsConfigurationVO.getTableCharges());
+			charge.setBlackWhiteCharges(journalsConfigurationVO.getBlackWhiteCharges());
+			charge.setColorCharges(journalsConfigurationVO.getColorCharges());
+			charge.setAdditionalCharges(journalsConfigurationVO.getAdditionalCharges());
+			charge.setProductionCharges(journalsConfigurationVO.getProductionCharges());
+			charge.setTypeSettingCharges(journalsConfigurationVO.getTypeSettingCharges());
+		}
+		
+		journalChargeDetailsRepo.save(charge);
+	}
+
+	@Override
+	public void saveJournalBlindType(Integer id, String blindType) {
+		Journal journal = journalRepo.getOne(id);
+		journalRepo.save(journal);
+	}
+
+	// Upload File
+	@Override
+	public List<JournalconfigFileUpload> getFileList(Integer journalId) {
+		return journalconfigFileUploadRepo.getFileList(journalId);
+	}
+
+	@Override
+	public String deleteJournalconfigFile(JournalVO journalVO) {
+		JournalconfigFileUpload fileDetails=journalconfigFileUploadRepo.getOne(journalVO.getId());
+		String fileName = fileDetails.getFileName();
+		String filePath = fileDetails.getFilePath();
+		String finalPath = filePath.replace(environment.getProperty("file.upload-dirServer") + "//",environment.getProperty("file.zipMaking-dir"));
+		try {
+			FileUtils.forceDelete(new File(finalPath));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		journalconfigFileUploadRepo.deleteById(journalVO.getId());
+		return "File Deleted ";
+	}
+
+	@Override
+	public boolean isIdExist(Integer id) {
+		return journalconfigFileUploadRepo.existsById(id);
+	}
+
+	@Override
+	public JournalconfigFileUpload saveFile(JournalconfigFileUpload journalconfigFileUpload) {
+		return journalconfigFileUploadRepo.save(journalconfigFileUpload);
+	}
+
+	@Override
+	public List<FileType> getFileTypeList() {
+		return fileTypeRepo.findAll();
+	}
+
+	@Override
+	public JournalconfigFileUpload JournalconfigFile(Integer id) {
+		return journalconfigFileUploadRepo.JournalconfigFileByID(id);
+	}
+
+	// Email Template
+
+	@Override
+	public List<MailTemplates> getEmailList() {
+		return mailTemplatesRepo.findAll();
+	}
+
+	@Override
+	public String deleteEmail(Integer id) {
+		mailTemplatesRepo.deleteById(id);
+		return "Email Deleted";
+	}
+
+	@Override
+	public boolean isEmailIdExist(Integer id) {
+		return mailTemplatesRepo.existsById(id);
+	}
+
+	// KeyWords
+	@Override
+	public List<KeywordsVO> getJournalKeyWordList(Integer journalId) {
+		List<Keywords> list = keywordsRepo.getKeywordsByJournalId(journalId);
+		List<KeywordsVO> voList = KeywordsTransformationUtils.mapModelListToVOList(list);
+		return voList;
+	}
+
+	@Override
+	public void saveKeyWords(List<Keywords> keywords) {
+		for(Keywords data : keywords) {
+			keywordsRepo.save(data);
+		}
+	}
+
+	@Override
+	public List<Journal> getJournalsList() {
+		return journalsRepo.findAll();
+	}
+
+	@Override
+	public void deleteKeyword(Integer id) {
+		keywordsRepo.deleteKeyword(id);
+	}
+
+	@Override
+	public Keywords updateKeyword(Keywords keywords) {
+		return keywordsRepo.save(keywords);
+	}
+
+	@Override
+	public void updateKeywordList(List<KeywordsVO> voList) {
+		List<Keywords> list = KeywordsTransformationUtils.mapVoListToModelList(voList);
+		keywordsRepo.saveAll(list);
+	}
+
+	// AutoMailers
+	@Override
+	public List<JournalMailTemplates> getTemplate(Integer journalId) {
+		return journalMailTemplatesRepo.getTemplate(journalId);
+	}
+
+	@Override
+	public String saveList(List<JournalconfigFileUpload> journalconfigFileUpload) {
+		journalconfigFileUpload.stream().forEach(i->{
+			journalconfigFileUploadRepo.updateJournalconfigFileUpload(i.getId(), i.getDocType());
+		});
+		return "file successfully saved";
+	}
+
+	// Dev Here New
+	@SuppressWarnings("null")
+	@Override
+	public List<JournalPlagiarismMasterVO> getjournalPlagiarismlist(Integer journalId) {
+		List<JournalPlagiarismMaster> journalPlagiarismList = journalPlagiarismMasterRepo
+				.getjournalPlagiarismlist(journalId);
+		if (journalPlagiarismList != null && !journalPlagiarismList.isEmpty()) {
+			List<JournalPlagiarismMasterVO> jVo = new ArrayList<JournalPlagiarismMasterVO>();
+			journalPlagiarismList.stream().forEach(i -> {
+				JournalPlagiarismMasterVO jour = new JournalPlagiarismMasterVO();
+				jour.setPlaMid(i.getId());
+				jour.setPlaId(i.getId());
+				jour.setProcessName(i.getProcessName());
+				jour.setJournalId(journalId);
+				jour.setProcessDescription(i.getProcessDescription());
+				JournalPlagirism journalPlagiarism = journalPlagirismRepo.getjournalPlagiarismlist(i.getJournalId(),
+						i.getId());
+				if (journalPlagiarism != null) {
+
+					jour.setAcceptedSubmission(journalPlagiarism.getAcceptedSubmission());
+					jour.setOrginalSubmission(journalPlagiarism.getOrginalSubmission());
+					jour.setResubmissionSubmission(journalPlagiarism.getResubmissionSubmission());
+					jour.setRevisedSubmission(journalPlagiarism.getRevisedSubmission());
+				} else {
+					try {
+						JournalPlagirism createJournalPlagirism = new JournalPlagirism();
+						createJournalPlagirism.setPlaId(i.getId());
+						createJournalPlagirism.setJournalId(i.getJournalId());
+						createJournalPlagirism.setAcceptedSubmission(0);
+						createJournalPlagirism.setOrginalSubmission(0);
+						createJournalPlagirism.setResubmissionSubmission(0);
+						createJournalPlagirism.setRevisedSubmission(0);
+						JournalPlagirism jp = journalPlagirismRepo.save(createJournalPlagirism);
+						jour.setAcceptedSubmission(jp.getAcceptedSubmission());
+						jour.setOrginalSubmission(jp.getOrginalSubmission());
+						jour.setResubmissionSubmission(jp.getResubmissionSubmission());
+						jour.setRevisedSubmission(jp.getRevisedSubmission());
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+
+				}
+
+				jVo.add(jour);
+			});
+			return jVo;
+		}
+		else {
+			List<MasterAttributes> masetPlagrismlis= masterAttributesRepo.getCheckList(PLAGARISM_CHECKLIST);
+			List<JournalPlagiarismMasterVO> jVo = new ArrayList<JournalPlagiarismMasterVO>();
+			for (MasterAttributes masterAttributes : masetPlagrismlis) {
+				JournalPlagiarismMasterVO jour = new JournalPlagiarismMasterVO();
+				jour.setProcessName(masterAttributes.getChkKey());
+				jour.setJournalId(journalId);
+				jour.setProcessDescription(masterAttributes.getChkDesc());
+				jVo.add(jour);
+			}
+			return jVo;
+		}
+	}
+
+	@Override
+	public void updatePlagiarism(List<JournalPlagiarismUpdateVO> journalPlagiarismUpdateVO) {
+		journalPlagiarismUpdateVO.stream().forEach(i -> {
+			if(i.getPlaId()!=null) {
+				journalPlagirismRepo.updatePlagiarism(i.getJournalId(), i.getPlaId(), i.getOrginalSubmission(),
+						i.getRevisedSubmission(), i.getResubmissionSubmission(), i.getAcceptedSubmission());
+			}
+			else {
+				JournalPlagiarismMaster master=new JournalPlagiarismMaster();
+				master.setJournalId(i.getJournalId());
+				master.setProcessName(i.getProcessName());
+				if(i.getProcessDescription()!=null)
+				master.setProcessDescription(i.getProcessDescription());
+				else
+				master.setProcessDescription("");
+				master.setPublisherId(1);
+				JournalPlagiarismMaster plaId=journalPlagiarismMasterRepo.save(master);
+				JournalPlagirism journalPlagrism=new JournalPlagirism();
+				journalPlagrism.setJournalId(i.getJournalId());
+				journalPlagrism.setPlaId(plaId.getId());
+				journalPlagrism.setRoleId(4);
+				journalPlagrism.setOrginalSubmission(i.getOrginalSubmission());
+				journalPlagrism.setRevisedSubmission(i.getRevisedSubmission());
+				journalPlagrism.setResubmissionSubmission(i.getResubmissionSubmission());
+				journalPlagrism.setAcceptedSubmission(i.getAcceptedSubmission());
+				journalPlagrism.setCreatedBy("1");
+				journalPlagirismRepo.save(journalPlagrism);
+			}
+			
+		});
+	}
+
+	@Override
+	public String blind(Integer jornalId, String type) {
+		JournalMetadata metaData = journalMetadataRepo.metaDatalistByJournalId(jornalId);
+		if (metaData != null) {
+			journalMetadataRepo.updateBlind(jornalId, type);
+			return "Blind Updated !!";
+		} else {
+			JournalMetadata jMeta = new JournalMetadata();
+			jMeta.setJournalId(jornalId);
+			jMeta.setJournalBlindType(type);
+			journalMetadataRepo.save(jMeta);
+			return "Blind Created !!";
+		}
+	}
+
+	@Override
+	public String getBlind(Integer jornalId) {
+		JournalMetadata metadata = journalMetadataRepo.metaDatalistByJournalId(jornalId);
+		if (metadata != null) {
+			return metadata.getJournalBlindType();
+		}
+		return "Null";
+	}
+
+	@Override
+	public void assignAdmin(AssignAdminVO assignAdminVO) {
+		userRepo.deleteExistingManagingEditorsForJournal(assignAdminVO.getJournalId());
+		
+		for (Integer userId : assignAdminVO.getUserId()) {
+			UserJournal userJournal = new UserJournal();
+			userJournal.setUserId(userId);
+			userJournal.setJournalId(assignAdminVO.getJournalId());
+			userJournalRepo.save(userJournal);
+		}
+	}
+
+	@Override
+	public List<TurnAroundTimeVO> getjournalTatConfigurationList(TurnAroundTimeVO turnAroundTimeVO) {
+		List<JournalTatConfiguration> journalTatList = journalTatConfigurationRepo
+				.journalTatConfiguration(turnAroundTimeVO.getJournalId());
+		List<TurnAroundTimeVO> tAVo = new ArrayList<>();
+
+		if (journalTatList != null && !journalTatList.isEmpty()) {
+			journalTatList.stream().forEach(i -> {
+				TurnAroundTimeVO turnAround = new TurnAroundTimeVO();
+				StatusMaster status = statusMasterRepo.getStatusMaster(i.getStatusId());
+				turnAround.setStatusId(status.getId());
+				turnAround.setStatusValue(status.getStatusValue());
+				turnAround.setJournalTatConfigId(i.getId());
+				turnAround.setJournalId(i.getJournalId());
+				turnAround.setStatusId(i.getStatusId());
+				turnAround.setTurnArroundTime(i.getTurnAroundTime());
+				turnAround.setBuffered(i.getBufferedTime());
+				turnAround.setReqAlert(Integer.toString(i.getRequiredAlert()));
+				tAVo.add(turnAround);
+			});
+			return tAVo;
+		}
+		List<StatusMaster> statusMasterList = statusMasterRepo.getStatusMasterTatValue();
+		statusMasterList.stream().forEach(i -> {
+			TurnAroundTimeVO turnAround = new TurnAroundTimeVO();
+			turnAround.setJournalTatConfigId(0);
+			turnAround.setStatusId(i.getId());
+			turnAround.setStatusValue(i.getStatusValue());
+			turnAround.setBuffered(0);
+			turnAround.setTurnArroundTime(0);
+			turnAround.setReqAlert("0");
+			turnAround.setJournalId(turnAroundTimeVO.getJournalId());
+			tAVo.add(turnAround);
+		});
+		return tAVo;
+	}
+
+	@Override
+	public String saveJournalTatConfiguration(JournalTatConfigurationVO journalTatConfigurationVO) {
+		journalTatConfigurationVO.getTurnAroundTimeVO().stream().forEach(i -> {
+			if (i.getJournalTatConfigId() != 0) {
+				JournalTatConfiguration journal = new JournalTatConfiguration();
+				journal.setId(i.getJournalTatConfigId());
+				journal.setJournalId(i.getJournalId());
+				journal.setStatusId(i.getStatusId());
+				journal.setTurnAroundTime(i.getTurnArroundTime());
+				journal.setBufferedTime(i.getBuffered());
+				journal.setRequiredAlert(Integer.parseInt(i.getReqAlert()));
+				journalTatConfigurationRepo.save(journal);
+
+			} else if (i.getJournalTatConfigId() == 0) {
+				JournalTatConfiguration journal = new JournalTatConfiguration();
+				journal.setJournalId(i.getJournalId());
+				journal.setStatusId(i.getStatusId());
+				journal.setTurnAroundTime(i.getTurnArroundTime());
+				journal.setBufferedTime(i.getBuffered());
+				journal.setRequiredAlert(Integer.parseInt(i.getReqAlert()));
+				journalTatConfigurationRepo.save(journal);
+			}
+
+		});
+		return "Journal Tat Configuration Updated ";
+	}
+
+	@Override
+	public List<EmailTemplateData> getEmailTemplateData() {
+		return emailTemplateDataRepo.getEmailTemplateData(TEMPLATE_PLACEHOLDERS);
+	}
+
+	@Override
+	public String saveJournalMailTemplate(JournalMailTemplatesVO journalMailTemplatesVO) {
+		if (journalMailTemplatesVO.getJournalEmailTemplateId() == null) {
+			JournalMailTemplates journalTemplate = new JournalMailTemplates();
+			journalTemplate.setEmailTemplateName(journalMailTemplatesVO.getEmailTemplateName());
+			journalTemplate.setEmailTemplateForm(journalMailTemplatesVO.getEmailTemplateForm());
+			journalTemplate.setJournalId(journalMailTemplatesVO.getJournalId());
+			journalTemplate.setTemplatePlaceholderId(journalMailTemplatesVO.getTemplatePlaceholderId());
+			journalTemplate.setIsActive("yes");
+			journalTemplate.setMailBcc(journalMailTemplatesVO.getMailBcc());
+			journalTemplate.setMailBody(journalMailTemplatesVO.getMailBody());
+			journalTemplate.setMailcc(journalMailTemplatesVO.getMailcc());
+			journalTemplate.setMailSubject(journalMailTemplatesVO.getMailSubject());
+			journalTemplate.setMailTo(journalMailTemplatesVO.getMailTo());
+			journalTemplate.setMailFrom(journalMailTemplatesVO.getMailFrom());
+			journalTemplate.setUserGroup(journalMailTemplatesVO.getUserGroup());
+			journalMailTemplatesRepo.save(journalTemplate);
+			return "Mail Template Save Successfully";
+		} else {
+			JournalMailTemplates journalTemplate = new JournalMailTemplates();
+			journalTemplate.setJournalEmailTemplateId(journalMailTemplatesVO.getJournalEmailTemplateId());
+			journalTemplate.setEmailTemplateName(journalMailTemplatesVO.getEmailTemplateName());
+			journalTemplate.setEmailTemplateForm(journalMailTemplatesVO.getEmailTemplateForm());
+			journalTemplate.setJournalId(journalMailTemplatesVO.getJournalId());
+			journalTemplate.setTemplatePlaceholderId(journalMailTemplatesVO.getTemplatePlaceholderId());
+			journalTemplate.setIsActive("yes");
+			journalTemplate.setMailBcc(journalMailTemplatesVO.getMailBcc());
+			journalTemplate.setMailBody(journalMailTemplatesVO.getMailBody());
+			journalTemplate.setMailcc(journalMailTemplatesVO.getMailcc());
+			journalTemplate.setMailSubject(journalMailTemplatesVO.getMailSubject());
+			journalTemplate.setMailTo(journalMailTemplatesVO.getMailTo());
+			journalTemplate.setMailFrom(journalMailTemplatesVO.getMailFrom());
+			journalTemplate.setUserGroup(journalMailTemplatesVO.getUserGroup());
+			journalMailTemplatesRepo.save(journalTemplate);
+			return "Mail Template Updated Successfully";
+		}
+
+	}
+
+	@Override
+	public List<JournalMailTemplatesVO> getEmailTemplates(Integer journalId) {
+		List<JournalMailTemplates> journalMail = journalMailTemplatesRepo.getTemplate(journalId);
+		if (journalMail != null) {
+			List<JournalMailTemplatesVO> journalArray = new ArrayList<>();
+			journalMail.stream().forEach(i -> {
+				JournalMailTemplatesVO jVo = new JournalMailTemplatesVO();
+				jVo.setJournalEmailTemplateId(i.getJournalEmailTemplateId());
+				jVo.setEmailTemplateName(i.getEmailTemplateName());
+				jVo.setTemplatePlaceholderId(i.getTemplatePlaceholderId());
+				jVo.setJournalId(i.getJournalId());
+				jVo.setEmailTemplateForm(i.getEmailTemplateForm());
+				jVo.setIsActive(i.getIsActive());
+				jVo.setMailBcc(i.getMailBcc());
+				jVo.setMailBody(i.getMailBody());
+				jVo.setMailcc(i.getMailcc());
+				jVo.setMailSubject(i.getMailSubject());
+				jVo.setMailTo(i.getMailTo());
+				jVo.setMailFrom(i.getMailFrom());
+				List<Role> roleName = roleRepo.getRoleByName(i.getUserGroup());
+				jVo.setUserGroup(roleName.get(0).getRoleName());
+				jVo.setCreatedOn(i.getCreatedOn());
+				jVo.setUpdatedOn(i.getUpdatedOn());
+				journalArray.add(jVo);
+			});
+			return journalArray;
+		}
+		return null;
+	}
+
+	@Override
+	public List<TaskMaster> getTaskName() {
+		return taskMasterRepo.findAll();
+	}
+
+	@Override
+	public String saveAutoMailers(AutoMailersVO autoMailersVO) {
+		TaskEmailMap taskEmailMap=taskEmailMapRepo.getUniqueTaskEmailMapData(autoMailersVO.getJournalMailTemplateId(),autoMailersVO.getTaskMasterId(),autoMailersVO.getJournalId());
+		if(taskEmailMap!=null) {
+			return "Choose The Unique Template Name And Task Name";
+		}
+		else {
+		TaskEmailMap task = new TaskEmailMap();
+		task.setJournalEmailTemplateId(autoMailersVO.getJournalMailTemplateId());
+		task.setTaskId(autoMailersVO.getTaskMasterId());
+		task.setJournalId(autoMailersVO.getJournalId());
+		taskEmailMapRepo.save(task);
+		return "Auto Mailer Save";
+		}
+	}
+
+	@Override
+	public List<AutoMailersVO> getAutoMailesList(AutoMailersVO autoMailersVO) {
+		List<TaskEmailMap> taskEmailList = taskEmailMapRepo.getAutoMailesList(autoMailersVO.getJournalId());
+		if (taskEmailList != null && !taskEmailList.isEmpty()) {
+			List<AutoMailersVO> autoMailer = new ArrayList<>();
+			taskEmailList.stream().forEach(i -> {
+				AutoMailersVO auto = new AutoMailersVO();
+				auto.setJournalId(i.getJournalId());
+				auto.setTaskMasterId(i.getTaskId());
+				auto.setJournalMailTemplateId(i.getJournalMailTemplates().getJournalEmailTemplateId());
+				auto.setEmailTemplateName(i.getJournalMailTemplates().getEmailTemplateName());
+				auto.setTaskName(i.getTaskMaster().getTaskName());
+				auto.setEmailTemplateForm(i.getJournalMailTemplates().getEmailTemplateForm());
+				auto.setTaskEmailMapId(i.getTemId());
+				autoMailer.add(auto);
+			});
+			return autoMailer;
+		}
+		return null;
+	}
+
+	@Override
+	public String deleteAutoMailer(AutoMailersVO autoMailersVO) {
+		taskEmailMapRepo.deleteById(autoMailersVO.getTaskEmailMapId());
+		return "Deleted Successfully";
+	}
+
+	@Override
+	public List<Integer> getAssignAdminIdList(Integer journalId) {
+		List<User> list = userRepo.getAssignAdmin(journalId);
+		List<Integer> userId = new ArrayList<Integer>();
+		list.stream().forEach(x -> userId.add(x.getId()));
+		return userId;
+	}
+
+	@Override
+	public void deleteManuscriptTypeJournal(Integer id) {
+		manuscriptTypeJournalsRepo.deleteById(id);
+	}
+
+	@Override
+	public String downloadJournalFile(JournalVO journalVO) {
+		JournalconfigFileUpload fileDetails=journalconfigFileUploadRepo.getOne(journalVO.getId());
+		String filePath=fileDetails.getFilePath();
+		return filePath;
+	}
+
+}

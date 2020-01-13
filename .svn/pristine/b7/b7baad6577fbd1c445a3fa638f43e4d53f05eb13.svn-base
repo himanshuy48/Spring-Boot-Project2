@@ -1,0 +1,420 @@
+package com.digi.uniprr.serviceImpl;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.transaction.Transactional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.digi.uniprr.VO.IDVO;
+import com.digi.uniprr.VO.ManuScriptByJournalVo;
+import com.digi.uniprr.VO.ReportVO;
+import com.digi.uniprr.VO.ReviewerDataWithCommentVO;
+import com.digi.uniprr.VO.ReviewerOverviewVO;
+import com.digi.uniprr.VO.UserJournalManuscriptVo;
+import com.digi.uniprr.model.Journal;
+import com.digi.uniprr.model.ManuScript;
+import com.digi.uniprr.model.ManuScriptReviewer;
+import com.digi.uniprr.model.ManuscriptEditor;
+import com.digi.uniprr.model.UserJournal;
+import com.digi.uniprr.repository.JournalsRepo;
+import com.digi.uniprr.repository.ManuScriptRepo;
+import com.digi.uniprr.repository.ManuScriptReviewerRepo;
+import com.digi.uniprr.repository.ManuscriptEditorRepo;
+import com.digi.uniprr.repository.UserJournalRepo;
+import com.digi.uniprr.service.ReportSevice;
+
+@Service
+@Transactional
+public class ReportSeviceImpl implements ReportSevice {
+
+	@Autowired
+	ManuScriptRepo manuScriptRepo;
+	@Autowired
+	private UserJournalRepo userJournalRepo;
+	@Autowired
+	private ManuScriptReviewerRepo manuScriptReviewerRepo;
+	@Autowired
+	private JournalsRepo journalsRepo;
+
+	@Autowired
+	ManuscriptEditorRepo manuscriptEditorRepo;
+
+	@Override
+	public List<ReportVO> getReport(UserJournalManuscriptVo userJournalManuscriptVo) {
+		List<ReportVO> report = new ArrayList<>();
+		List<ManuScript> manuscriptData = manuScriptRepo.getManuscriptByUser(userJournalManuscriptVo.getUserId(),
+				userJournalManuscriptVo.getManuscriptStatusId());
+
+		for (ManuScript m : manuscriptData) {
+			ReportVO reportTempData = new ReportVO();
+			reportTempData.setAuthorId(m.getAuthorId());
+			reportTempData.setManuscriptCode(m.getManuscriptCode());
+			reportTempData.setManuscriptTitle(m.getManuscriptTitle());
+			reportTempData.setManuscriptVersion(m.getManuscriptVersion());
+			reportTempData.setSubmissionDate(m.getSubmissionDate());
+			reportTempData.setManuscriptStatusId(m.getManuscriptStatusId());
+
+			reportTempData.setJournalId(m.getJournal().getJournalId());
+			reportTempData.setJournalCode(m.getJournal().getJournalCode());
+			reportTempData.setJournalTitle(m.getJournal().getJournalTitle());
+			reportTempData.setPublisherId(m.getJournal().getPublisherId());
+			if (m.getUser() != null) {
+				reportTempData.setAuthorName(m.getUser().getFirstName() + m.getUser().getLastName());
+			}
+			reportTempData.setManuscriptStatusCode(m.getStatusMaster().getStatusValue());
+
+			report.add(reportTempData);
+		}
+
+		return report;
+	}
+
+	@Override
+	public List<ManuScriptByJournalVo> getManuScriptByJournal(ManuScriptByJournalVo manuScriptByJournalVo) {
+		List<UserJournal> userJournalList = userJournalRepo.getUserJournalByUserId(manuScriptByJournalVo.getUserId());
+		List<ManuScriptByJournalVo> listVo = new ArrayList<>();
+		if (userJournalList != null && !userJournalList.isEmpty()) {
+			for (UserJournal i : userJournalList) {
+				List<ManuScript> manuscript = manuScriptRepo.getManuScriptByJournalId(i.getJournalId());
+				ManuScriptByJournalVo journal = new ManuScriptByJournalVo();
+				journal.setJournalId(i.getJournalId());
+				journal.setJournalCode(i.getJournal().getJournalCode());
+				journal.setJournalTitle(i.getJournal().getJournalTitle());
+				int count = 0;
+				int new_Submitted_Manuscript = 0;
+				int manuscript_in_Review = 0;
+				int re_submitted_Manuscript = 0;
+				int manuscript_Sent_for_Revision = 0;
+				int decision_on_Manuscript = 0;
+				int total_Manuscript = 0;
+				manuScriptByJournalVo.getStatusId().contains(2);
+				for (ManuScript list : manuscript) {
+					if (list.getManuscriptStatusId() != 1)
+						count++;
+					if (list.getManuscriptStatusId() == 2)
+						new_Submitted_Manuscript++;
+					if (list.getManuscriptStatusId() == 3 || list.getManuscriptStatusId() == 35
+							|| list.getManuscriptStatusId() == 8)
+						manuscript_in_Review++;
+					if (list.getManuscriptStatusId() == 26)
+						re_submitted_Manuscript++;
+					if (list.getManuscriptStatusId() == 4)
+						manuscript_Sent_for_Revision++;
+					if (list.getManuscriptStatusId() == 30 || list.getManuscriptStatusId() == 33
+							|| list.getManuscriptStatusId() == 37 || list.getManuscriptStatusId() == 38)
+						decision_on_Manuscript++;
+					if (list.getManuscriptStatusId() == 2 || list.getManuscriptStatusId() == 30
+							|| list.getManuscriptStatusId() == 33 || list.getManuscriptStatusId() == 37
+							|| list.getManuscriptStatusId() == 38 || list.getManuscriptStatusId() == 34
+							|| list.getManuscriptStatusId() == 26 || list.getManuscriptStatusId() == 3
+							|| list.getManuscriptStatusId() == 35 || list.getManuscriptStatusId() == 8)
+						total_Manuscript++;
+				}
+				journal.setNew_Submitted_Manuscript(new_Submitted_Manuscript);
+				journal.setManuscript_in_Review(manuscript_in_Review);
+				journal.setRe_submitted_Manuscript(re_submitted_Manuscript);
+				journal.setManuscript_Sent_for_Revision(manuscript_Sent_for_Revision);
+				journal.setDecision_on_Manuscript(decision_on_Manuscript);
+				journal.setTotal_Manuscript(total_Manuscript);
+				journal.setCount(count);
+				journal.setUserId(manuScriptByJournalVo.getUserId());
+				listVo.add(journal);
+			}
+		}
+		return listVo;
+	}
+
+	@Override
+	public List<ReviewerOverviewVO> getReviewerOverview(Integer userId) {
+		List<UserJournal> userJournalList = userJournalRepo.getUserJournalByUserId(userId);
+		List<ReviewerOverviewVO> list = new ArrayList<>();
+		if (userJournalList != null && !userJournalList.isEmpty()) {
+			for (UserJournal i : userJournalList) {
+				ReviewerOverviewVO journal = new ReviewerOverviewVO();
+				journal.setJournalId(i.getJournalId());
+				journal.setJournalCode(i.getJournal().getJournalCode());
+				journal.setJournalTitle(i.getJournal().getJournalTitle());
+				List<ManuScriptReviewer> manu = manuScriptReviewerRepo
+						.getManuscriptReviewerByJournalId(i.getJournalId());
+				Integer acceptedByReviewer = 0;
+				Integer rejectedByReviewer = 0;
+				Integer minorRevisionReviewer = 0;
+				Integer majorRevisionReviewer = 0;
+				Integer acceptReviewInvitation = 0;
+				Integer rejectReviewInvitation = 0;
+				for (ManuScriptReviewer list1 : manu) {
+					if (list1.getManuscriptStatus() == 12) {
+						acceptedByReviewer++;
+					} else if (list1.getManuscriptStatus() == 13) {
+						rejectedByReviewer++;
+					} else if (list1.getManuscriptStatus() == 14) {
+						minorRevisionReviewer++;
+					} else if (list1.getManuscriptStatus() == 15) {
+						majorRevisionReviewer++;
+					} else if (list1.getManuscriptStatus() == 35) {
+						acceptReviewInvitation++;
+					} else if (list1.getManuscriptStatus() == 36) {
+						rejectReviewInvitation++;
+					}
+				}
+				journal.setAccepted_By_Reviewer(acceptedByReviewer);
+				journal.setRejected_By_Reviewer(rejectedByReviewer);
+				journal.setMinor_Revision_Reviewer(minorRevisionReviewer);
+				journal.setMajor_Revision_Reviewer(majorRevisionReviewer);
+				journal.setAccept_Review_Invitation(acceptReviewInvitation);
+				journal.setReject_Review_Invitation(rejectReviewInvitation);
+				list.add(journal);
+			}
+		}
+		return list;
+	}
+
+	@Override
+	public List<ReportVO> getReportByUserId(IDVO userId) {
+
+		List<ReportVO> report = new ArrayList<>();
+
+		if (userId.getVersion() != null && userId.getVersion() == 1) {
+			List<ManuScript> manuscriptList = new ArrayList<>();
+			List<Integer> JournalId = new ArrayList<>();
+			List<Journal> journalList = journalsRepo.getJournalByUserId(userId.getId());
+
+			if (journalList != null && !journalList.isEmpty()) {
+				for (Journal journal : journalList) {
+					JournalId.add(journal.getJournalId());
+				}
+
+				if (JournalId != null && !JournalId.isEmpty()) {
+					manuscriptList = manuScriptRepo.getManuscriptByJournalList(JournalId);
+				}
+				if (manuscriptList != null && !manuscriptList.isEmpty()) {
+					for (ManuScript manuscript : manuscriptList) {
+						ReportVO reportTempData = new ReportVO();
+						reportTempData.setAuthorId(manuscript.getAuthorId());
+						reportTempData.setManuscriptCode(manuscript.getManuscriptCode());
+						reportTempData.setManuscriptTitle(manuscript.getManuscriptTitle());
+						reportTempData.setManuscriptVersion(manuscript.getManuscriptVersion());
+						reportTempData.setSubmissionDate(manuscript.getSubmissionDate());
+						reportTempData.setManuscriptStatusId(manuscript.getManuscriptStatusId());
+						reportTempData.setJournalId(manuscript.getJournal().getJournalId());
+						reportTempData.setJournalCode(manuscript.getJournal().getJournalCode());
+						reportTempData.setJournalTitle(manuscript.getJournal().getJournalTitle());
+						reportTempData.setPublisherId(manuscript.getJournal().getPublisherId());
+						reportTempData.setAuthorName(
+								manuscript.getUser().getFirstName() + manuscript.getUser().getLastName());
+						reportTempData.setManuscriptStatusCode(manuscript.getStatusMaster().getStatusValue());
+						report.add(reportTempData);
+					}
+				}
+			}
+		} else if (userId.getVersion() != null && userId.getVersion() == 2) {
+			List<ManuScript> manuscriptList = new ArrayList<>();
+			List<Integer> JournalId = new ArrayList<>();
+
+			List<UserJournal> UserJournals = userJournalRepo.getUserJournalByUserId(userId.getId());
+
+			if (UserJournals != null && !UserJournals.isEmpty()) {
+				for (UserJournal journal : UserJournals) {
+					JournalId.add(journal.getJournalId());
+				}
+
+				if (JournalId != null && !JournalId.isEmpty()) {
+					manuscriptList = manuScriptRepo.getManuscriptByJournalList(JournalId);
+				}
+				if (manuscriptList != null && !manuscriptList.isEmpty()) {
+					for (ManuScript manuscript : manuscriptList) {
+						ReportVO reportTempData = new ReportVO();
+						reportTempData.setAuthorId(manuscript.getAuthorId());
+						reportTempData.setManuscriptCode(manuscript.getManuscriptCode());
+						reportTempData.setManuscriptTitle(manuscript.getManuscriptTitle());
+						reportTempData.setManuscriptVersion(manuscript.getManuscriptVersion());
+						reportTempData.setSubmissionDate(manuscript.getSubmissionDate());
+						reportTempData.setManuscriptStatusId(manuscript.getManuscriptStatusId());
+						reportTempData.setJournalId(manuscript.getJournal().getJournalId());
+						reportTempData.setJournalCode(manuscript.getJournal().getJournalCode());
+						reportTempData.setJournalTitle(manuscript.getJournal().getJournalTitle());
+						reportTempData.setPublisherId(manuscript.getJournal().getPublisherId());
+						reportTempData.setAuthorName(
+								manuscript.getUser().getFirstName() + manuscript.getUser().getLastName());
+						reportTempData.setManuscriptStatusCode(manuscript.getStatusMaster().getStatusValue());
+						report.add(reportTempData);
+					}
+				}
+			}
+		} else if (userId.getVersion() != null && userId.getVersion() == 3) {
+			List<ManuScript> manuscriptList = new ArrayList<>();
+			List<Integer> ManuscriptId = new ArrayList<>();
+
+			List<ManuscriptEditor> manuscriptEditorData = manuscriptEditorRepo.getManuscriptEditorById(userId.getId());
+
+			if (manuscriptEditorData != null && !manuscriptEditorData.isEmpty()) {
+				for (ManuscriptEditor manuscriptEditor : manuscriptEditorData) {
+					ManuscriptId.add(manuscriptEditor.getManuscriptId());
+				}
+
+				if (ManuscriptId != null && !ManuscriptId.isEmpty()) {
+					manuscriptList = manuScriptRepo.findAllById(ManuscriptId);
+				}
+
+				if (manuscriptList != null && !manuscriptList.isEmpty()) {
+					for (ManuScript manuscript : manuscriptList) {
+						ReportVO reportTempData = new ReportVO();
+						reportTempData.setAuthorId(manuscript.getAuthorId());
+						reportTempData.setManuscriptCode(manuscript.getManuscriptCode());
+						reportTempData.setManuscriptTitle(manuscript.getManuscriptTitle());
+						reportTempData.setManuscriptVersion(manuscript.getManuscriptVersion());
+						reportTempData.setSubmissionDate(manuscript.getSubmissionDate());
+						reportTempData.setManuscriptStatusId(manuscript.getManuscriptStatusId());
+						reportTempData.setJournalId(manuscript.getJournal().getJournalId());
+						reportTempData.setJournalCode(manuscript.getJournal().getJournalCode());
+						reportTempData.setJournalTitle(manuscript.getJournal().getJournalTitle());
+						reportTempData.setPublisherId(manuscript.getJournal().getPublisherId());
+						reportTempData.setAuthorName(
+								manuscript.getUser().getFirstName() + manuscript.getUser().getLastName());
+						reportTempData.setManuscriptStatusCode(manuscript.getStatusMaster().getStatusValue());
+						report.add(reportTempData);
+					}
+				}
+			}
+		} else if (userId.getVersion() != null && userId.getVersion() == 4) {
+
+			List<ManuScript> manuscriptList = manuScriptRepo.getManuScripAuthorId(userId.getId());
+
+			if (manuscriptList != null && !manuscriptList.isEmpty()) {
+				for (ManuScript manuscript : manuscriptList) {
+					ReportVO reportTempData = new ReportVO();
+					reportTempData.setAuthorId(manuscript.getAuthorId());
+					reportTempData.setManuscriptCode(manuscript.getManuscriptCode());
+					reportTempData.setManuscriptTitle(manuscript.getManuscriptTitle());
+					reportTempData.setManuscriptVersion(manuscript.getManuscriptVersion());
+					reportTempData.setSubmissionDate(manuscript.getSubmissionDate());
+					reportTempData.setManuscriptStatusId(manuscript.getManuscriptStatusId());
+					reportTempData.setJournalId(manuscript.getJournal().getJournalId());
+					reportTempData.setJournalCode(manuscript.getJournal().getJournalCode());
+					reportTempData.setJournalTitle(manuscript.getJournal().getJournalTitle());
+					reportTempData.setPublisherId(manuscript.getJournal().getPublisherId());
+					reportTempData
+							.setAuthorName(manuscript.getUser().getFirstName() + manuscript.getUser().getLastName());
+					reportTempData.setManuscriptStatusCode(manuscript.getStatusMaster().getStatusValue());
+					report.add(reportTempData);
+				}
+			}
+		} else if (userId.getVersion() != null && userId.getVersion() == 5) {
+
+			List<ManuScript> manuscriptList = new ArrayList<>();
+			List<Integer> ManuscriptId = new ArrayList<>();
+
+			List<ManuScriptReviewer> manuscriptEditorData = manuScriptReviewerRepo.getReviewerDataById(userId.getId());
+
+			if (manuscriptEditorData != null && !manuscriptEditorData.isEmpty()) {
+				for (ManuScriptReviewer manuscriptEditor : manuscriptEditorData) {
+					ManuscriptId.add(manuscriptEditor.getManuscriptId());
+				}
+
+				if (ManuscriptId != null && !ManuscriptId.isEmpty()) {
+					manuscriptList = manuScriptRepo.findAllById(ManuscriptId);
+				}
+
+				if (manuscriptList != null && !manuscriptList.isEmpty()) {
+					for (ManuScript manuscript : manuscriptList) {
+						ReportVO reportTempData = new ReportVO();
+						reportTempData.setAuthorId(manuscript.getAuthorId());
+						reportTempData.setManuscriptCode(manuscript.getManuscriptCode());
+						reportTempData.setManuscriptTitle(manuscript.getManuscriptTitle());
+						reportTempData.setManuscriptVersion(manuscript.getManuscriptVersion());
+						reportTempData.setSubmissionDate(manuscript.getSubmissionDate());
+						reportTempData.setManuscriptStatusId(manuscript.getManuscriptStatusId());
+						reportTempData.setJournalId(manuscript.getJournal().getJournalId());
+						reportTempData.setJournalCode(manuscript.getJournal().getJournalCode());
+						reportTempData.setJournalTitle(manuscript.getJournal().getJournalTitle());
+						reportTempData.setPublisherId(manuscript.getJournal().getPublisherId());
+						reportTempData.setAuthorName(
+								manuscript.getUser().getFirstName() + manuscript.getUser().getLastName());
+						reportTempData.setManuscriptStatusCode(manuscript.getStatusMaster().getStatusValue());
+						report.add(reportTempData);
+					}
+				}
+			}
+
+		}
+
+		return report;
+
+	}
+
+	@Override
+	public List<ReviewerDataWithCommentVO> getReviewerOverviewReport(IDVO userId) {
+
+		List<ReviewerDataWithCommentVO> reviewerDataWithCommentVOData = new ArrayList<>();
+
+		if (userId.getVersion() != null && userId.getVersion() == 1) {
+			List<Integer> JournalId = new ArrayList<>();
+			List<Journal> journalList = journalsRepo.getJournalByUserId(userId.getId());
+
+			if (journalList != null && !journalList.isEmpty()) {
+				for (Journal journal : journalList) {
+					JournalId.add(journal.getJournalId());
+				}
+
+				List<ManuScriptReviewer> manuScriptReviewer = manuScriptReviewerRepo
+						.getManuscriptReviewerListByJournal(JournalId);
+				if (manuScriptReviewer != null && !manuScriptReviewer.isEmpty()) {
+					for (ManuScriptReviewer mr : manuScriptReviewer) {
+						ReviewerDataWithCommentVO reviewerDataWithCommentVO = new ReviewerDataWithCommentVO();
+						reviewerDataWithCommentVO.setManuscriptId(mr.getManuscriptId());
+						reviewerDataWithCommentVO.setManuscriptVersion(mr.getManuscriptVersion());
+						reviewerDataWithCommentVO
+								.setManuscriptStatusCode(mr.getManuscript().getStatusMaster().getStatusValue());
+						reviewerDataWithCommentVO.setReviewerId(mr.getReviewerId());
+						reviewerDataWithCommentVO.setReviewerName(mr.getManuscript().getUser().getFirstName() + " "
+								+ mr.getManuscript().getUser().getLastName());
+						reviewerDataWithCommentVO.setDecisionLetter(mr.getDecisionLetter());
+						reviewerDataWithCommentVO.setCommentsToAuthor(mr.getCommentsToAuthor());
+						reviewerDataWithCommentVO.setCommentsToEditor(mr.getCommentsToEditor());
+						reviewerDataWithCommentVO.setJournalId(mr.getJournalId());
+						reviewerDataWithCommentVOData.add(reviewerDataWithCommentVO);
+					}
+
+				}
+			}
+
+		}else if (userId.getVersion() != null && userId.getVersion() == 2) {
+			List<ManuScript> manuscriptList = new ArrayList<>();
+			List<Integer> JournalId = new ArrayList<>();
+
+			List<UserJournal> UserJournals = userJournalRepo.getUserJournalByUserId(userId.getId());
+
+			if (UserJournals != null && !UserJournals.isEmpty()) {
+				for (UserJournal journal : UserJournals) {
+					JournalId.add(journal.getJournalId());
+				}
+				List<ManuScriptReviewer> manuScriptReviewer = manuScriptReviewerRepo
+						.getManuscriptReviewerListByJournal(JournalId);	
+				
+				if (manuScriptReviewer != null && !manuScriptReviewer.isEmpty()) {
+					for (ManuScriptReviewer mr : manuScriptReviewer) {
+						ReviewerDataWithCommentVO reviewerDataWithCommentVO = new ReviewerDataWithCommentVO();
+						reviewerDataWithCommentVO.setManuscriptId(mr.getManuscriptId());
+						reviewerDataWithCommentVO.setManuscriptVersion(mr.getManuscriptVersion());
+						reviewerDataWithCommentVO
+								.setManuscriptStatusCode(mr.getManuscript().getStatusMaster().getStatusValue());
+						reviewerDataWithCommentVO.setReviewerId(mr.getReviewerId());
+						reviewerDataWithCommentVO.setReviewerName(mr.getManuscript().getUser().getFirstName() + " "
+								+ mr.getManuscript().getUser().getLastName());
+						reviewerDataWithCommentVO.setDecisionLetter(mr.getDecisionLetter());
+						reviewerDataWithCommentVO.setCommentsToAuthor(mr.getCommentsToAuthor());
+						reviewerDataWithCommentVO.setCommentsToEditor(mr.getCommentsToEditor());
+						reviewerDataWithCommentVO.setJournalId(mr.getJournalId());
+						reviewerDataWithCommentVOData.add(reviewerDataWithCommentVO);
+					}
+
+				}
+			}
+		}
+		return reviewerDataWithCommentVOData;
+	}
+
+}
